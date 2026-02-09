@@ -1,0 +1,232 @@
+name: Build HLDS CSNZ (Advanced)
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
+
+env:
+  BUILD_CONFIGURATION: Release
+  PLATFORM: Win32
+
+jobs:
+  build-windows:
+    name: Build HLDS CSNZ for Windows
+    runs-on: windows-2022
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x86
+    
+    - name: Setup Visual Studio Dev Environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+    
+    - name: Install NuGet
+      uses: NuGet/setup-nuget@v2
+    
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+    
+    - name: Restore NuGet packages
+      run: nuget restore HLDS_CSNZ.sln
+      continue-on-error: true
+    
+    - name: Build Solution (Release x86)
+      run: |
+        msbuild HLDS_CSNZ.sln `
+          /p:Configuration=Release `
+          /p:Platform=Win32 `
+          /p:PlatformToolset=v143 `
+          /m `
+          /v:minimal `
+          /fl `
+          /flp:LogFile=build.log;Verbosity=diagnostic
+    
+    - name: Build Solution (Release x64)
+      run: |
+        msbuild HLDS_CSNZ.sln `
+          /p:Configuration=Release `
+          /p:Platform=x64 `
+          /p:PlatformToolset=v143 `
+          /m `
+          /v:minimal
+      continue-on-error: true
+    
+    - name: Find built files
+      id: find-dlls
+      shell: pwsh
+      run: |
+        Write-Host "Searching for built artifacts..."
+        
+        $artifacts = @()
+        $searchPaths = @(
+          "Release",
+          "x86/Release", 
+          "Win32/Release",
+          "Debug",
+          "x86/Debug",
+          "Win32/Debug",
+          "out",
+          "build"
+        )
+        
+        foreach ($path in $searchPaths) {
+          if (Test-Path $path) {
+            $files = Get-ChildItem -Path $path -Recurse -Include *.dll,*.exe,*.so -ErrorAction SilentlyContinue
+            $artifacts += $files
+          }
+        }
+        
+        if ($artifacts.Count -eq 0) {
+          Write-Host "No artifacts found! Listing all DLL/EXE files..."
+          Get-ChildItem -Recurse -Include *.dll,*.exe | Select-Object FullName
+        } else {
+          Write-Host "Found $($artifacts.Count) artifacts:"
+          $artifacts | ForEach-Object { Write-Host "  - $($_.FullName)" }
+        }
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: HLDS-CSNZ-Windows-Release
+        path: |
+          **/Release/**/*.dll
+          **/Release/**/*.exe
+          **/Win32/Release/**/*.dll
+          **/Win32/Release/**/*.exe
+          **/x86/Release/**/*.dll
+          **/x86/Release/**/*.exe
+          !**/obj/**
+        if-no-files-found: warn
+        retention-days: 30
+    
+    - name: Upload debug symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: HLDS-CSNZ-PDB-Files
+        path: |
+          **/Release/**/*.pdb
+          **/Win32/Release/**/*.pdb
+        if-no-files-found: ignore
+        retention-days: 7
+    
+    - name: Upload build log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
+        if-no-files-found: ignore
+        retention-days: 7
+
+  build-linux:
+    name: Build HLDS CSNZ for Linux
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install dependencies
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-multilib \
+          g++-multilib \
+          build-essential \
+          cmake \
+          git
+    
+    - name: Check for Makefile or CMakeLists
+      id: check-build
+      run: |
+        if [ -f "Makefile" ]; then
+          echo "build_system=make" >> $GITHUB_OUTPUT
+        elif [ -f "CMakeLists.txt" ]; then
+          echo "build_system=cmake" >> $GITHUB_OUTPUT
+        else
+          echo "build_system=none" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Build with Make
+      if: steps.check-build.outputs.build_system == 'make'
+      run: |
+        make clean || true
+        make -j$(nproc)
+    
+    - name: Build with CMake
+      if: steps.check-build.outputs.build_system == 'cmake'
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake --build . -j$(nproc)
+    
+    - name: Upload Linux artifacts
+      if: steps.check-build.outputs.build_system != 'none'
+      uses: actions/upload-artifact@v4
+      with:
+        name: HLDS-CSNZ-Linux-Release
+        path: |
+          **/*.so
+          build/**/*.so
+          Release/**/*.so
+        if-no-files-found: warn
+        retention-days: 30
+
+  create-release:
+    name: Create Release Package
+    needs: [build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: HLDS-CSNZ-Windows-Release
+        path: release/
+    
+    - name: Create archive
+      run: |
+        cd release
+        zip -r ../HLDS-CSNZ-${{ github.ref_name }}.zip .
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: HLDS-CSNZ-${{ github.ref_name }}.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
