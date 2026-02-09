@@ -54,12 +54,12 @@ jobs:
           ${{ runner.os }}-nuget-
     
     - name: Restore NuGet packages
-      run: nuget restore HLDS_CSNZ.sln
+      run: nuget restore CSOHLDS.sln
       continue-on-error: true
     
     - name: Build Solution (Release x86)
       run: |
-        msbuild HLDS_CSNZ.sln `
+        msbuild CSOHLDS.sln `
           /p:Configuration=Release `
           /p:Platform=Win32 `
           /p:PlatformToolset=v143 `
@@ -70,7 +70,7 @@ jobs:
     
     - name: Build Solution (Release x64)
       run: |
-        msbuild HLDS_CSNZ.sln `
+        msbuild CSOHLDS.sln `
           /p:Configuration=Release `
           /p:Platform=x64 `
           /p:PlatformToolset=v143 `
