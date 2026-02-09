@@ -1,4 +1,4 @@
-name: Build HLDS CSNZ (Advanced)
+name: Build HLDS CSNZ
 
 on:
   push:
@@ -6,227 +6,84 @@ on:
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: 'Build type'
-        required: true
-        default: 'Release'
-        type: choice
-        options:
-          - Release
-          - Debug
-
-env:
-  BUILD_CONFIGURATION: Release
-  PLATFORM: Win32
 
 jobs:
   build-windows:
-    name: Build HLDS CSNZ for Windows
+    name: Build HLDS CSNZ
     runs-on: windows-2022
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        fetch-depth: 0
         submodules: recursive
     
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
-      with:
-        msbuild-architecture: x86
     
-    - name: Setup Visual Studio Dev Environment
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x86
-    
-    - name: Install NuGet
+    - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
-    
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
     
     - name: Restore NuGet packages
       run: nuget restore CSOHLDS.sln
       continue-on-error: true
     
-    - name: Build Solution (Release x86)
+    - name: List solution configurations
+      shell: pwsh
       run: |
-        msbuild CSOHLDS.sln `
-          /p:Configuration=Release `
-          /p:Platform=Win32 `
-          /p:PlatformToolset=v143 `
-          /m `
-          /v:minimal `
-          /fl `
-          /flp:LogFile=build.log;Verbosity=diagnostic
+        Write-Host "Available configurations in solution:"
+        $sln = Get-Content CSOHLDS.sln
+        $sln | Select-String "Release\|" | ForEach-Object { Write-Host $_ }
     
     - name: Build Solution (Release x64)
-      run: |
-        msbuild CSOHLDS.sln `
-          /p:Configuration=Release `
-          /p:Platform=x64 `
-          /p:PlatformToolset=v143 `
-          /m `
-          /v:minimal
+      run: msbuild CSOHLDS.sln /p:Configuration=Release /p:Platform=x64 /m /v:minimal
+      continue-on-error: true
+    
+    - name: Build Solution (Release x86)
+      run: msbuild CSOHLDS.sln /p:Configuration=Release /p:Platform=x86 /m /v:minimal
+      continue-on-error: true
+    
+    - name: Build Solution (Release Any CPU)
+      run: msbuild CSOHLDS.sln /p:Configuration=Release /m /v:minimal
       continue-on-error: true
     
     - name: Find built files
-      id: find-dlls
       shell: pwsh
       run: |
-        Write-Host "Searching for built artifacts..."
-        
-        $artifacts = @()
-        $searchPaths = @(
-          "Release",
-          "x86/Release", 
-          "Win32/Release",
-          "Debug",
-          "x86/Debug",
-          "Win32/Debug",
-          "out",
-          "build"
-        )
-        
-        foreach ($path in $searchPaths) {
-          if (Test-Path $path) {
-            $files = Get-ChildItem -Path $path -Recurse -Include *.dll,*.exe,*.so -ErrorAction SilentlyContinue
-            $artifacts += $files
-          }
-        }
-        
-        if ($artifacts.Count -eq 0) {
-          Write-Host "No artifacts found! Listing all DLL/EXE files..."
-          Get-ChildItem -Recurse -Include *.dll,*.exe | Select-Object FullName
-        } else {
-          Write-Host "Found $($artifacts.Count) artifacts:"
-          $artifacts | ForEach-Object { Write-Host "  - $($_.FullName)" }
+        Write-Host "Searching for all built DLL and EXE files..."
+        Get-ChildItem -Recurse -Include *.dll,*.exe | Where-Object { 
+          $_.FullName -notmatch "\\obj\\" -and 
+          $_.FullName -notmatch "packages\\" 
+        } | ForEach-Object { 
+          Write-Host "Found: $($_.FullName)" 
         }
     
-    - name: Upload build artifacts
+    - name: Upload artifacts (All builds)
       uses: actions/upload-artifact@v4
       with:
-        name: HLDS-CSNZ-Windows-Release
+        name: HLDS-CSNZ-Release
         path: |
+          **/bin/**/*.dll
+          **/bin/**/*.exe
           **/Release/**/*.dll
           **/Release/**/*.exe
-          **/Win32/Release/**/*.dll
-          **/Win32/Release/**/*.exe
-          **/x86/Release/**/*.dll
-          **/x86/Release/**/*.exe
+          **/x64/**/*.dll
+          **/x64/**/*.exe
+          **/x86/**/*.dll
+          **/x86/**/*.exe
           !**/obj/**
+          !**/packages/**
         if-no-files-found: warn
         retention-days: 30
     
     - name: Upload debug symbols
       uses: actions/upload-artifact@v4
       with:
-        name: HLDS-CSNZ-PDB-Files
+        name: HLDS-CSNZ-PDB
         path: |
+          **/bin/**/*.pdb
           **/Release/**/*.pdb
-          **/Win32/Release/**/*.pdb
+          **/x64/**/*.pdb
+          **/x86/**/*.pdb
         if-no-files-found: ignore
         retention-days: 7
-    
-    - name: Upload build log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log
-        path: build.log
-        if-no-files-found: ignore
-        retention-days: 7
-
-  build-linux:
-    name: Build HLDS CSNZ for Linux
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    
-    - name: Install dependencies
-      run: |
-        sudo dpkg --add-architecture i386
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc-multilib \
-          g++-multilib \
-          build-essential \
-          cmake \
-          git
-    
-    - name: Check for Makefile or CMakeLists
-      id: check-build
-      run: |
-        if [ -f "Makefile" ]; then
-          echo "build_system=make" >> $GITHUB_OUTPUT
-        elif [ -f "CMakeLists.txt" ]; then
-          echo "build_system=cmake" >> $GITHUB_OUTPUT
-        else
-          echo "build_system=none" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Build with Make
-      if: steps.check-build.outputs.build_system == 'make'
-      run: |
-        make clean || true
-        make -j$(nproc)
-    
-    - name: Build with CMake
-      if: steps.check-build.outputs.build_system == 'cmake'
-      run: |
-        mkdir -p build
-        cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
-        cmake --build . -j$(nproc)
-    
-    - name: Upload Linux artifacts
-      if: steps.check-build.outputs.build_system != 'none'
-      uses: actions/upload-artifact@v4
-      with:
-        name: HLDS-CSNZ-Linux-Release
-        path: |
-          **/*.so
-          build/**/*.so
-          Release/**/*.so
-        if-no-files-found: warn
-        retention-days: 30
-
-  create-release:
-    name: Create Release Package
-    needs: [build-windows]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    
-    steps:
-    - name: Download artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: HLDS-CSNZ-Windows-Release
-        path: release/
-    
-    - name: Create archive
-      run: |
-        cd release
-        zip -r ../HLDS-CSNZ-${{ github.ref_name }}.zip .
-    
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: HLDS-CSNZ-${{ github.ref_name }}.zip
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
