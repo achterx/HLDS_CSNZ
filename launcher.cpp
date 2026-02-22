@@ -82,7 +82,7 @@ public:
         g_pfnDediInitFunc1("Sys_InitArgv( m_OrigCmd )", "Sys_ShutdownArgv()", 0);
         g_pfnDediInitFunc2(this->m_OrigCmd);
         g_pCEngine->SetQuitting(0);
-        g_pCRegistry->Init();
+        //g_pCRegistry->Init();
         g_pIsDedicated = true;
 
         g_pfnDediInitFunc1("FileSystem_Init(basedir, (void *)filesystemFactory)", "FileSystem_Shutdown()", 0);
@@ -140,7 +140,7 @@ public:
         g_pCGame->DestroyWin();
         g_pfnDediShutdownFunc1("FileSystem_Shutdown()", 0);
         g_pfnDediShutdownFunc2();
-        g_pCRegistry->RegClose();
+        //g_pCRegistry->RegClose();
         g_pfnDediShutdownFunc1("Sys_ShutdownArgv()", 0);
         *(void**)g_pDediInitDwordExport = nullptr;
         return *(int*)g_pServerState;
