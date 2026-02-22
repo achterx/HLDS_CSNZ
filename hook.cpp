@@ -7,6 +7,7 @@
 #include <sstream>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <chrono>
 
 DWORD g_dwEngineBase;
 DWORD g_dwEngineSize;
