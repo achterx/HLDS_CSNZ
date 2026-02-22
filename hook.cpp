@@ -437,16 +437,7 @@ void Hook(HMODULE hModule)
 		g_pCEngine = *(CEngine**)g_pCEngine;
 	}
 
-	find = FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, "Failed to Initialize DirectX. Please restart launcher");
-	if (!find)
-		MessageBox(NULL, "CREGISTRY == NULL!!!", "Error", MB_OK);
-	else
-	{
-		BYTE b[4] = { 0,0,0,0 };
-		ReadMemory((void*)(find - 0x17), (BYTE*)b, 4);
-		WriteMemory((void*)&g_pCRegistry, (BYTE*)b, 4);
-		g_pCRegistry = *(CRegistry**)g_pCRegistry;
-	}
+	// g_pCRegistry skipped - not found as a global in this CSNZ build
 
 	find = FindPattern(CGAME_INSTANCE_SIG_CSNZ, CGAME_INSTANCE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
