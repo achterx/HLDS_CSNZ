@@ -72,29 +72,66 @@ private:
 public:
     bool Init(const char* basedir, const char* cmdline, CreateInterfaceFn launcherFactory, CreateInterfaceFn filesystemFactory)
     {
+        printf("[Trace] Init() called\n");
+        printf("[Trace] g_pDediInitDwordExport = %p\n", g_pDediInitDwordExport);
+        printf("[Trace] g_pfnDediInitFunc1 = %p\n", (void*)g_pfnDediInitFunc1);
+        printf("[Trace] g_pfnDediInitFunc2 = %p\n", (void*)g_pfnDediInitFunc2);
+        printf("[Trace] g_pfnDediInitFunc3 = %p\n", (void*)g_pfnDediInitFunc3);
+        printf("[Trace] g_pfnDediInitFunc5 = %p\n", (void*)g_pfnDediInitFunc5);
+        printf("[Trace] g_pfnDediInitFunc6 = %p\n", (void*)g_pfnDediInitFunc6);
+        printf("[Trace] g_pfnDediInitFunc7 = %p\n", (void*)g_pfnDediInitFunc7);
+        printf("[Trace] g_pfnDediInitFunc8 = %p\n", (void*)g_pfnDediInitFunc8);
+        printf("[Trace] g_pfnDediInitFunc9 = %p\n", (void*)g_pfnDediInitFunc9);
+        printf("[Trace] g_pfnDediInitFunc10 = %p\n", (void*)g_pfnDediInitFunc10);
+        printf("[Trace] g_pCEngine = %p\n", (void*)g_pCEngine);
+        printf("[Trace] g_pCGame = %p\n", (void*)g_pCGame);
+        printf("[Trace] g_pBaseSocket = %p\n", (void*)g_pBaseSocket);
+        printf("[Trace] g_pPacketHostServer = %p\n", g_pPacketHostServer);
+        printf("[Trace] g_pIsDedicated addr = %p\n", (void*)&g_pIsDedicated);
+        printf("[Trace] basedir = %s\n", basedir);
+        fflush(stdout);
+
         *(IDedicatedExports**)g_pDediInitDwordExport = (IDedicatedExports*)launcherFactory(VENGINE_DEDICATEDEXPORTS_API_VERSION, nullptr);
+        printf("[Trace] DediExports = %p\n", *(void**)g_pDediInitDwordExport);
         if (!*(IDedicatedExports**)g_pDediInitDwordExport)
+        {
+            printf("[Trace] FATAL: DediExports is NULL\n");
             return false;
+        }
 
         strncpy(this->m_OrigCmd, cmdline, ARRAYSIZE(this->m_OrigCmd));
         this->m_OrigCmd[ARRAYSIZE(this->m_OrigCmd) - 1] = 0;
 
+        printf("[Trace] calling DediInitFunc1 (Sys_InitArgv)\n"); fflush(stdout);
         g_pfnDediInitFunc1("Sys_InitArgv( m_OrigCmd )", "Sys_ShutdownArgv()", 0);
+        printf("[Trace] calling DediInitFunc2\n"); fflush(stdout);
         g_pfnDediInitFunc2(this->m_OrigCmd);
+        printf("[Trace] calling SetQuitting\n"); fflush(stdout);
         g_pCEngine->SetQuitting(0);
         // g_pCRegistry->Init(); // skipped - not found as global in this CSNZ build
         g_pIsDedicated = true;
+        printf("[Trace] g_pIsDedicated set to true\n"); fflush(stdout);
 
+        printf("[Trace] calling DediInitFunc1 (FileSystem_Init)\n"); fflush(stdout);
         g_pfnDediInitFunc1("FileSystem_Init(basedir, (void *)filesystemFactory)", "FileSystem_Shutdown()", 0);
+        printf("[Trace] calling DediInitFunc3 (FileSystem_Init)\n"); fflush(stdout);
         if (!g_pfnDediInitFunc3(basedir, (void*)filesystemFactory))
         {
+            printf("[Trace] FATAL: FileSystem_Init failed\n");
             return false;
         }
+        printf("[Trace] FileSystem_Init OK\n"); fflush(stdout);
+
+        printf("[Trace] calling CGame::CreateWin\n"); fflush(stdout);
         g_pCGame->CreateWin();
+        printf("[Trace] calling CGame::Init\n"); fflush(stdout);
         if (!g_pCGame->Init(nullptr))
         {
+            printf("[Trace] FATAL: CGame::Init failed\n");
             return false;
         }
+        printf("[Trace] CGame::Init OK\n"); fflush(stdout);
+
         char buffer[MAX_PATH];
         __time64_t currentTime = 0;
         currentTime = _time64(NULL);
@@ -103,35 +140,56 @@ public:
         _localtime64_s(&localTime, &currentTime);
 
         DWORD pid = GetCurrentProcessId();
+        printf("[Trace] calling DediInitFunc5 (log filenames)\n"); fflush(stdout);
         g_pfnDediInitFunc5(buffer, "%s_%04d%02d%02d_%02d%02d%02d_%u_%d.log", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
         g_pfnDediInitFunc5(g_pDediInitDword5, "%sFatal_%04d%02d%02d_%02d%02d%02d_%u_%d.log", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
         g_pfnDediInitFunc5(g_pDediInitDword6, "%s_##ADDR##_%04d%02d%02d_%02d%02d%02d_%u.dmp", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
 
         snprintf(g_pConsoleTitle, sizeof(g_pConsoleTitle), "%s_%04d%02d%02d_%02d%02d%02d_%u_%d", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
 
+        printf("[Trace] calling DediInitFunc8\n"); fflush(stdout);
         g_pfnDediInitFunc8(buffer, 0, 0);
 
         void* hwnd = g_pCGame->Func24();
+        printf("[Trace] hwnd from CGame::Func24 = %p\n", hwnd); fflush(stdout);
         g_pfnDediInitFunc6(hwnd);
 
+        printf("[Trace] g_pBaseSocket raw = %p\n", (void*)g_pBaseSocket);
+        printf("[Trace] *(DWORD*)g_pBaseSocket = %p\n", (void*)*(DWORD*)g_pBaseSocket);
+        printf("[Trace] socket+0xC ptr = %p\n", (void*)(*(DWORD*)g_pBaseSocket + 0xC));
+        fflush(stdout);
         *(DWORD**)(*(DWORD*)g_pBaseSocket + 0xC) = (DWORD*)g_pCGame->Func24();
+        printf("[Trace] BaseSocket hwnd set OK\n"); fflush(stdout);
+
+        printf("[Trace] calling CGame::Shutdown\n"); fflush(stdout);
         g_pCGame->Shutdown();
 
+        printf("[Trace] calling DediInitFunc10 (x2)\n"); fflush(stdout);
         g_pfnDediInitFunc10(buffer);
         g_pfnDediInitFunc10(g_pDediInitDword5);
 
+        printf("[Trace] calling CEngine::Load\n"); fflush(stdout);
         if (!g_pCEngine->Load(true, basedir, cmdline))
+        {
+            printf("[Trace] FATAL: CEngine::Load failed\n");
             return false;
+        }
+        printf("[Trace] CEngine::Load OK\n"); fflush(stdout);
 
-        //char text[256];
-        //snprintf(text, ARRAYSIZE(text), "exec %s\n", "server.cfg");
-        //text[255] = 0;
         g_pfnDediInitFunc7("exec server.cfg\n");
 
+        printf("[Trace] g_pPacketHostServer = %p\n", g_pPacketHostServer); fflush(stdout);
         if (g_pPacketHostServer)
         {
+            printf("[Trace] calling DediInitFunc9 (PacketHostServer)\n"); fflush(stdout);
             g_pfnDediInitFunc9(g_pPacketHostServer, buffer);
+            printf("[Trace] DediInitFunc9 OK\n"); fflush(stdout);
         }
+        else
+        {
+            printf("[Trace] WARNING: g_pPacketHostServer is NULL - server may not register with relay!\n"); fflush(stdout);
+        }
+        printf("[Trace] Init() complete\n"); fflush(stdout);
         return true;
     };
     int Shutdown()
