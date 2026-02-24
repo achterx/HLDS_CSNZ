@@ -131,6 +131,8 @@ public:
         printf("[Trace] g_pCRegistry (after Load, after deref) = %p\n", (void*)g_pCRegistry); fflush(stdout);
         if (g_pCRegistry)
         {
+            printf("[Trace] g_pCRegistry vtable = %p\n", *(void**)g_pCRegistry); fflush(stdout);
+            printf("[Trace] g_pCRegistry vtable[0] (Init) = %p\n", ((void**)*(void**)g_pCRegistry)[0]); fflush(stdout);
             printf("[Trace] calling g_pCRegistry->Init()\n"); fflush(stdout);
             g_pCRegistry->Init();
             printf("[Trace] g_pCRegistry->Init() OK\n"); fflush(stdout);
