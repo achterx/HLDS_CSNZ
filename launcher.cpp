@@ -82,20 +82,6 @@ public:
         g_pfnDediInitFunc1("Sys_InitArgv( m_OrigCmd )", "Sys_ShutdownArgv()", 0);
         g_pfnDediInitFunc2(this->m_OrigCmd);
         g_pCEngine->SetQuitting(0);
-        // g_pCRegistry holds address of the CRegistry* global - dereference it now
-        g_pCRegistry = *(CRegistry**)g_pCRegistry;
-        printf("[Trace] g_pCRegistry (after deref) = %p\n", (void*)g_pCRegistry); fflush(stdout);
-        if (g_pCRegistry)
-        {
-            printf("[Trace] *g_pCRegistry (vtable) = %p\n", *(void**)g_pCRegistry); fflush(stdout);
-            printf("[Trace] calling g_pCRegistry->Init()\n"); fflush(stdout);
-            g_pCRegistry->Init();
-            printf("[Trace] g_pCRegistry->Init() OK\n"); fflush(stdout);
-        }
-        else
-        {
-            printf("[Trace] WARNING: g_pCRegistry is NULL, skipping Init()\n"); fflush(stdout);
-        }
         g_pIsDedicated = true;
 
         g_pfnDediInitFunc1("FileSystem_Init(basedir, (void *)filesystemFactory)", "FileSystem_Shutdown()", 0);
@@ -134,6 +120,23 @@ public:
         g_pfnDediInitFunc10(g_pDediInitDword5);
 
         if (!g_pCEngine->Load(true, basedir, cmdline))
+        {
+            printf("[Trace] FATAL: CEngine::Load failed\n");
+            return false;
+        }
+        printf("[Trace] CEngine::Load OK\n"); fflush(stdout);
+
+        // Dereference g_pCRegistry now - engine has constructed it during Load
+        g_pCRegistry = *(CRegistry**)g_pCRegistry;
+        printf("[Trace] g_pCRegistry (after Load, after deref) = %p\n", (void*)g_pCRegistry); fflush(stdout);
+        if (g_pCRegistry)
+        {
+            printf("[Trace] calling g_pCRegistry->Init()\n"); fflush(stdout);
+            g_pCRegistry->Init();
+            printf("[Trace] g_pCRegistry->Init() OK\n"); fflush(stdout);
+        }
+        else
+            printf("[Trace] WARNING: g_pCRegistry still NULL after Load\n"); fflush(stdout);
             return false;
 
         //char text[256];
