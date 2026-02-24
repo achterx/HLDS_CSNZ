@@ -126,15 +126,18 @@ public:
         }
         printf("[Trace] CEngine::Load OK\n"); fflush(stdout);
 
-        //char text[256];
-        //snprintf(text, ARRAYSIZE(text), "exec %s\n", "server.cfg");
-        //text[255] = 0;
+        printf("[Trace] calling DediInitFunc7 (exec server.cfg)\n"); fflush(stdout);
         g_pfnDediInitFunc7("exec server.cfg\n");
+        printf("[Trace] DediInitFunc7 OK\n"); fflush(stdout);
 
+        printf("[Trace] g_pPacketHostServer = %p\n", (void*)g_pPacketHostServer); fflush(stdout);
         if (g_pPacketHostServer)
         {
+            printf("[Trace] calling DediInitFunc9\n"); fflush(stdout);
             g_pfnDediInitFunc9(g_pPacketHostServer, buffer);
+            printf("[Trace] DediInitFunc9 OK\n"); fflush(stdout);
         }
+        printf("[Trace] Init() returning true\n"); fflush(stdout);
         return true;
     };
     int Shutdown()
