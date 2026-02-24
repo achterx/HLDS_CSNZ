@@ -443,11 +443,12 @@ void Hook(HMODULE hModule)
 	else
 	{
 		// At find-0x30: 8B 0D [addr32] = mov ecx, [g_pCRegistry]
-		// Read the 4-byte address embedded in the instruction (at find-0x2E)
+		// Read the 4-byte address of the g_pCRegistry global (find-0x2E)
 		DWORD pCRegistryAddr = 0;
 		ReadMemory((void*)(find - 0x2E), (BYTE*)&pCRegistryAddr, 4);
+		// Store the ADDRESS of the global, not its value (engine hasn't constructed it yet)
 		WriteMemory((void*)&g_pCRegistry, (BYTE*)&pCRegistryAddr, 4);
-		g_pCRegistry = *(CRegistry**)pCRegistryAddr;
+		// g_pCRegistry now holds the address of the pointer - deref in launcher Init()
 	}
 
 	find = FindPattern(CGAME_INSTANCE_SIG_CSNZ, CGAME_INSTANCE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
