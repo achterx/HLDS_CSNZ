@@ -119,27 +119,12 @@ public:
         g_pfnDediInitFunc10(buffer);
         g_pfnDediInitFunc10(g_pDediInitDword5);
 
-        if (!g_pCEngine->Load(true, basedir, cmdline))
+        if (!g_pCEngine->Load(basedir, cmdline, nullptr, buffer))
         {
-            printf("[Trace] FATAL: CEngine::Load failed\n");
+            printf("[Trace] FATAL: CEngine::Load failed\n"); fflush(stdout);
             return false;
         }
         printf("[Trace] CEngine::Load OK\n"); fflush(stdout);
-
-        // Dereference g_pCRegistry now - engine has constructed it during Load
-        g_pCRegistry = *(CRegistry**)g_pCRegistry;
-        printf("[Trace] g_pCRegistry (after Load, after deref) = %p\n", (void*)g_pCRegistry); fflush(stdout);
-        if (g_pCRegistry)
-        {
-            printf("[Trace] g_pCRegistry vtable = %p\n", *(void**)g_pCRegistry); fflush(stdout);
-            printf("[Trace] g_pCRegistry vtable[0] (Init) = %p\n", ((void**)*(void**)g_pCRegistry)[0]); fflush(stdout);
-            printf("[Trace] calling g_pCRegistry->Init()\n"); fflush(stdout);
-            g_pCRegistry->Init();
-            printf("[Trace] g_pCRegistry->Init() OK\n"); fflush(stdout);
-        }
-        else
-            printf("[Trace] WARNING: g_pCRegistry still NULL after Load\n"); fflush(stdout);
-            return false;
 
         //char text[256];
         //snprintf(text, ARRAYSIZE(text), "exec %s\n", "server.cfg");
@@ -158,7 +143,6 @@ public:
         g_pCGame->DestroyWin();
         g_pfnDediShutdownFunc1("FileSystem_Shutdown()", 0);
         g_pfnDediShutdownFunc2();
-        g_pCRegistry->RegClose();
         g_pfnDediShutdownFunc1("Sys_ShutdownArgv()", 0);
         *(void**)g_pDediInitDwordExport = nullptr;
         return *(int*)g_pServerState;

@@ -29,7 +29,7 @@ private:
 	int m_nTrapButtons;
 public:
 	virtual void Destructor() = 0;
-	virtual bool Load(bool dedi, const char* basedir, const char* cmdline) = 0;
+	virtual bool Load(const char* basedir, const char* cmdline, void* pUnknownCallback, const char* logfile) = 0;
 	virtual void Unload() = 0;
 	virtual int SetState(int) = 0;
 	virtual int GetState() = 0;
