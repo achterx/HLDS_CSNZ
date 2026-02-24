@@ -442,9 +442,17 @@ void Hook(HMODULE hModule)
 		MessageBox(NULL, "g_pCRegistry == NULL!!!", "Error", MB_OK);
 	else
 	{
+		char dbg[256];
+		snprintf(dbg, sizeof(dbg), "[CRegistry] FindPush found at: %p\n  -0x30 reads bytes: %02X %02X %02X %02X %02X %02X",
+			(void*)find,
+			*(BYTE*)(find - 0x30), *(BYTE*)(find - 0x2F), *(BYTE*)(find - 0x2E),
+			*(BYTE*)(find - 0x2D), *(BYTE*)(find - 0x2C), *(BYTE*)(find - 0x2B));
+		MessageBox(NULL, dbg, "CRegistry Debug", MB_OK);
 		BYTE b[4] = { 0,0,0,0 };
-		ReadMemory((void*)(find - 0x30), (BYTE*)b, 4); // mov ecx, dword_g_pCRegistry at -0x30 from "User Token 2" push
+		ReadMemory((void*)(find - 0x30), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pCRegistry, (BYTE*)b, 4);
+		snprintf(dbg, sizeof(dbg), "[CRegistry] g_pCRegistry = %p", (void*)g_pCRegistry);
+		MessageBox(NULL, dbg, "CRegistry Debug", MB_OK);
 	}
 
 	find = FindPattern(CGAME_INSTANCE_SIG_CSNZ, CGAME_INSTANCE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
