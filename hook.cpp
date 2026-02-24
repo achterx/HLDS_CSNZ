@@ -437,7 +437,15 @@ void Hook(HMODULE hModule)
 		g_pCEngine = *(CEngine**)g_pCEngine;
 	}
 
-	// g_pCRegistry skipped - not found as a global in this CSNZ build
+	find = FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, "User Token 2");
+	if (!find)
+		MessageBox(NULL, "g_pCRegistry == NULL!!!", "Error", MB_OK);
+	else
+	{
+		BYTE b[4] = { 0,0,0,0 };
+		ReadMemory((void*)(find - 0x30), (BYTE*)b, 4); // mov ecx, dword_g_pCRegistry at -0x30 from "User Token 2" push
+		WriteMemory((void*)&g_pCRegistry, (BYTE*)b, 4);
+	}
 
 	find = FindPattern(CGAME_INSTANCE_SIG_CSNZ, CGAME_INSTANCE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
