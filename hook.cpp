@@ -8,6 +8,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+#define LOG(fmt, ...) do { printf("[HOOK] " fmt "\n", ##__VA_ARGS__); fflush(stdout); } while(0)
+
 DWORD g_dwEngineBase;
 DWORD g_dwEngineSize;
 
@@ -409,6 +411,7 @@ DWORD WINAPI HookThread(LPVOID lpThreadParameter)
 void Hook(HMODULE hModule)
 {
 	Init(hModule);
+	LOG("=== Hook() START === base=0x%08X size=0x%08X", g_dwEngineBase, g_dwEngineSize);
 
 	DWORD find = NULL;
 	void* dummy = NULL;
@@ -418,12 +421,14 @@ void Hook(HMODULE hModule)
 		MessageBox(NULL, "DEDI_API_ADDTEXT == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediAddTextFunc = (pfnDediAddTextFunc)(find + 0x30);
+	LOG("DEDI_API_ADDTEXT: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_UPDATESTATUS_SIG_CSNZ, DEDI_API_UPDATESTATUS_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_UPDATESTATUS == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediUpdateStatusFunc = (pfnDediUpdateStatusFunc)find;
+	LOG("DEDI_API_UPDATESTATUS: find=0x%08X", find);
 
 	find = FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, "QuitLog : GetQuitting [%d]\n");
 	if (!find)
@@ -435,6 +440,7 @@ void Hook(HMODULE hModule)
 		WriteMemory((void*)&g_pCEngine, (BYTE*)b, 4);
 		g_pCEngine = *(CEngine**)g_pCEngine;
 	}
+	LOG("CENGINE: find=0x%08X", find);
 
 	find = FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, "Failed to Initialize DirectX. Please restart launcher");
 	if (!find)
@@ -457,6 +463,7 @@ void Hook(HMODULE hModule)
 		WriteMemory((void*)&g_pCGame, (BYTE*)b, 4);
 		g_pCGame = *(CGame**)g_pCGame;
 	}
+	LOG("CGAME: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_1_SIG_CSNZ, DEDI_INIT_DWORD_1_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -469,6 +476,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x46), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pDediInitDword2, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_1: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_3_SIG_CSNZ, DEDI_INIT_DWORD_3_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -479,6 +487,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x15), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pBaseSocket, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_3: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_4_SIG_CSNZ, DEDI_INIT_DWORD_4_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -489,6 +498,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x2), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pPacketHostServer, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_4: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_5_SIG_CSNZ, DEDI_INIT_DWORD_5_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -499,6 +509,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0xBB), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pDediInitDword5, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_5: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_6_SIG_CSNZ, DEDI_INIT_DWORD_6_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -509,6 +520,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x6B), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pDediInitDword6, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_6: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_EXPORT_SIG_CSNZ, DEDI_INIT_DWORD_EXPORT_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -519,6 +531,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x3E), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pDediInitDwordExport, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_EXPORT: find=0x%08X", find);
 
 	find = FindPattern(DEDI_INIT_DWORD_8_SIG_CSNZ, DEDI_INIT_DWORD_8_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -529,6 +542,7 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x35), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pDediInitDword8, (BYTE*)b, 4);
 	}
+	LOG("DEDI_INIT_DWORD_8: find=0x%08X", find);
 
 	find = FindPattern(CSERVERSTATE_SIG_CSNZ, CSERVERSTATE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -539,60 +553,70 @@ void Hook(HMODULE hModule)
 		ReadMemory((void*)(find + 0x15), (BYTE*)b, 4);
 		WriteMemory((void*)&g_pServerState, (BYTE*)b, 4);
 	}
+	LOG("CSERVERSTATE: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_1_SIG_CSNZ, DEDI_API_INIT_FUNC_1_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_1 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc1 = (pfnDediInitFunc1)find;
+	LOG("DEDI_API_INIT_FUNC_1: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_2_SIG_CSNZ, DEDI_API_INIT_FUNC_2_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_2 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc2 = (pfnDediInitFunc2)find;
+	LOG("DEDI_API_INIT_FUNC_2: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_3_SIG_CSNZ, DEDI_API_INIT_FUNC_3_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_3 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc3 = (pfnDediInitFunc3)find;
+	LOG("DEDI_API_INIT_FUNC_3: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_5_SIG_CSNZ, DEDI_API_INIT_FUNC_5_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_5 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc5 = (pfnDediInitFunc5)find;
+	LOG("DEDI_API_INIT_FUNC_5: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_6_SIG_CSNZ, DEDI_API_INIT_FUNC_6_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_6 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc6 = (pfnDediInitFunc6)(find - 0x10);
+	LOG("DEDI_API_INIT_FUNC_6: find=0x%08X", find);
 
 	find = FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, "Cbuf_AddText: overflow\n");
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_7 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc7 = (pfnDediInitFunc7)(find - 0x72);
+	LOG("DEDI_API_INIT_FUNC_7: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_8_SIG_CSNZ, DEDI_API_INIT_FUNC_8_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_8 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc8 = (pfnDediInitFunc8)find;
+	LOG("DEDI_API_INIT_FUNC_8: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_9_SIG_CSNZ, DEDI_API_INIT_FUNC_9_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_9 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc9 = (pfnDediInitFunc9)find;
+	LOG("DEDI_API_INIT_FUNC_9: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_INIT_FUNC_10_SIG_CSNZ, DEDI_API_INIT_FUNC_10_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_INIT_FUNC_10 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediInitFunc10 = (pfnDediInitFunc10)find;
+	LOG("DEDI_API_INIT_FUNC_10: find=0x%08X", find);
 
 
 	find = FindPattern(DEDI_API_SHUTDOWN_FUNC_1_SIG_CSNZ, DEDI_API_SHUTDOWN_FUNC_1_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
@@ -600,12 +624,14 @@ void Hook(HMODULE hModule)
 		MessageBox(NULL, "DEDI_API_SHUTDOWN_FUNC_1 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediShutdownFunc1 = (pfnDediShutdownFunc1)find;
+	LOG("DEDI_API_SHUTDOWN_FUNC_1: find=0x%08X", find);
 
 	find = FindPattern(DEDI_API_SHUTDOWN_FUNC_2_SIG_CSNZ, DEDI_API_SHUTDOWN_FUNC_2_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "DEDI_API_SHUTDOWN_FUNC_2 == NULL!!!", "Error", MB_OK);
 	else
 		g_pfnDediShutdownFunc2 = (pfnDediShutdownFunc2)find;
+	LOG("DEDI_API_SHUTDOWN_FUNC_2: find=0x%08X", find);
 
 	find = FindPattern(PACKET_HACK_SEND_SIG_CSNZ, PACKET_HACK_SEND_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -615,24 +641,28 @@ void Hook(HMODULE hModule)
 		InlineHookFromCallOpcode((void*)find, NGClient_Void, dummy, dummy);
 		InlineHookFromCallOpcode((void*)(find + 0x5), NGClient_Return1, dummy, dummy);
 	}
+	LOG("Packet_Hack_Send: find=0x%08X", find);
 
 	find = FindPattern(PACKET_HACK_PARSE_SIG_CSNZ, PACKET_HACK_PARSE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "Packet_Hack_Parse == NULL!!!", "Error", MB_OK);
 	else
 		InlineHook((void*)find, Hook_Packet_Hack_Parse, dummy);
+	LOG("Packet_Hack_Parse: find=0x%08X", find);
 
 	find = FindPattern(SOCKETMANAGER_SIG_CSNZ23, SOCKETMANAGER_MASK_CSNZ23, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "SocketManagerConstructor == NULL!!!", "Error", MB_OK);
 	else
 		InlineHook((void*)find, Hook_SocketManagerConstructor, (void*&)g_pfnSocketManagerConstructor);
+	LOG("SocketManagerConstructor: find=0x%08X", find);
 
 	find = FindPattern(LOGTOERRORLOG_SIG_CSNZ, LOGTOERRORLOG_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "LogToErrorLog == NULL!!!", "Error", MB_OK);
 	else
 		InlineHook((void*)find, Hook_LogToErrorLog, (void*&)g_pfnLogToErrorLog);
+	LOG("LogToErrorLog: find=0x%08X", find);
 
 	g_pEngine = (cl_enginefunc_t*)(PVOID) * (PDWORD)(FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, (PCHAR)("ScreenFade")) + 0x0D);
 	if (!g_pEngine)
@@ -648,6 +678,7 @@ void Hook(HMODULE hModule)
 			MessageBox(NULL, "GetSSLProtocolName == NULL!!!", "Error", MB_OK);
 		else
 			InlineHookFromCallOpcode((void*)find, Hook_GetSSLProtocolName, (void*&)g_pfnGetSSLProtocolName, dummy);
+	LOG("GetSSLProtocolName: find=0x%08X", find);
 
 		// hook SocketConstructor to create ctx objects
 		find = FindPattern(SOCKETCONSTRUCTOR_SIG_CSNZ, SOCKETCONSTRUCTOR_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
@@ -655,6 +686,7 @@ void Hook(HMODULE hModule)
 			MessageBox(NULL, "SocketConstructor == NULL!!!", "Error", MB_OK);
 		else
 			InlineHookFromCallOpcode((void*)find, Hook_SocketConstructor, (void*&)g_pfnSocketConstructor, dummy);
+	LOG("SocketConstructor: find=0x%08X", find);
 
 		find = FindPattern(EVP_CIPHER_CTX_NEW_SIG_CSNZ, EVP_CIPHER_CTX_NEW_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 		if (!find)
@@ -665,18 +697,21 @@ void Hook(HMODULE hModule)
 			g_pfnEVP_CIPHER_CTX_new = (tEVP_CIPHER_CTX_new)(dwCreateCtxAddr + 4 + *(DWORD*)dwCreateCtxAddr);
 		}
 	}
+	LOG("EVP_CIPHER_CTX_new: find=0x%08X", find);
 
 	find = FindPattern(PACKET_VOXEL_PARSE_SIG_CSNZ, PACKET_VOXEL_PARSE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "Packet_Voxel_Parse == NULL!!!", "Error", MB_OK);
 	else
 		InlineHook((void*)find, Hook_Packet_Voxel_Parse, (void*&)g_pfnPacket_Voxel_Parse);
+	LOG("Packet_Voxel_Parse: find=0x%08X", find);
 
 	find = FindPattern(VOXEL_LOADWORLD_SIG_CSNZ, VOXEL_LOADWORLD_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
 		MessageBox(NULL, "Voxel_LoadWorld == NULL!!!", "Error", MB_OK);
 	else
 		InlineHook((void*)find, Hook_Voxel_LoadWorld, (void*&)g_pfnVoxel_LoadWorld);
+	LOG("Voxel_LoadWorld: find=0x%08X", find);
 
 	find = FindPattern(VOXELADAPTER_PTR_SIG_CSNZ, VOXELADAPTER_PTR_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
 	if (!find)
@@ -686,6 +721,7 @@ void Hook(HMODULE hModule)
 		DWORD dwVoxelAdapterAddr = find + 1;
 		g_pVoxelAdapter = (tCVoxelAdapter)(dwVoxelAdapterAddr + 4 + *(DWORD*)dwVoxelAdapterAddr);
 	}
+	LOG("VoxelAdapter_Ptr: find=0x%08X", find);
 
 	// patch 1000 fps limit
 	find = FindPush(g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, "%3i fps -- host(%3.0f) sv(%3.0f) cl(%3.0f) gfx(%3.0f) snd(%3.0f) ents(%d)\n", 2);
@@ -697,9 +733,11 @@ void Hook(HMODULE hModule)
 		BYTE patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 		WriteMemory((void*)patchAddr, (BYTE*)patch, sizeof(patch));
 	}
+	LOG("1000Fps_Patch: find=0x%08X", find);
 
 	// create thread to wait for mp.dll
 	CreateThread(NULL, 0, HookThread, NULL, 0, 0);
+	LOG("=== Hook() COMPLETE ===");
 }
 
 void Unhook()

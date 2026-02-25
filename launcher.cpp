@@ -28,6 +28,8 @@
 #define LAUNCHER_ERROR	-1
 #define LAUNCHER_OK		0
 
+
+#define LOG(fmt, ...) do { printf("[HLDS] " fmt "\n", ##__VA_ARGS__); fflush(stdout); } while(0)
 char g_pLogFile[MAX_PATH];
 char g_pConsoleTitle[MAX_PATH];
 int g_iPort = 27015;
@@ -72,29 +74,41 @@ private:
 public:
     bool Init(const char* basedir, const char* cmdline, CreateInterfaceFn launcherFactory, CreateInterfaceFn filesystemFactory)
     {
+        LOG("Init() start");
         *(IDedicatedExports**)g_pDediInitDwordExport = (IDedicatedExports*)launcherFactory(VENGINE_DEDICATEDEXPORTS_API_VERSION, nullptr);
+        LOG("IDedicatedExports = %p", *(IDedicatedExports**)g_pDediInitDwordExport);
         if (!*(IDedicatedExports**)g_pDediInitDwordExport)
-            return false;
+        { LOG("FATAL: IDedicatedExports NULL"); return false; }
 
         strncpy(this->m_OrigCmd, cmdline, ARRAYSIZE(this->m_OrigCmd));
         this->m_OrigCmd[ARRAYSIZE(this->m_OrigCmd) - 1] = 0;
 
+        LOG("DediInitFunc1 Sys_InitArgv...");
         g_pfnDediInitFunc1("Sys_InitArgv( m_OrigCmd )", "Sys_ShutdownArgv()", 0);
+        LOG("DediInitFunc1 OK");
+        LOG("DediInitFunc2 ParseCmdLine...");
         g_pfnDediInitFunc2(this->m_OrigCmd);
+        LOG("DediInitFunc2 OK");
+        LOG("SetQuitting(0)...");
         g_pCEngine->SetQuitting(0);
         //g_pCRegistry->Init();
+        LOG("SetQuitting OK");
         g_pIsDedicated = true;
 
+        LOG("DediInitFunc1 FileSystem_Init...");
         g_pfnDediInitFunc1("FileSystem_Init(basedir, (void *)filesystemFactory)", "FileSystem_Shutdown()", 0);
+        LOG("DediInitFunc1 FileSystem OK");
+        LOG("DediInitFunc3 (FileSystem init) basedir=%s...", basedir);
         if (!g_pfnDediInitFunc3(basedir, (void*)filesystemFactory))
-        {
-            return false;
-        }
+        { LOG("FATAL: DediInitFunc3 failed"); return false; }
+        LOG("DediInitFunc3 OK");
+        LOG("CGame::CreateWin()...");
         g_pCGame->CreateWin();
+        LOG("CGame::CreateWin OK");
+        LOG("CGame::Init(nullptr)...");
         if (!g_pCGame->Init(nullptr))
-        {
-            return false;
-        }
+        { LOG("FATAL: CGame::Init failed"); return false; }
+        LOG("CGame::Init OK");
         char buffer[MAX_PATH];
         __time64_t currentTime = 0;
         currentTime = _time64(NULL);
@@ -109,29 +123,48 @@ public:
 
         snprintf(g_pConsoleTitle, sizeof(g_pConsoleTitle), "%s_%04d%02d%02d_%02d%02d%02d_%u_%d", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
 
+        LOG("DediInitFunc8 (init log) buffer=%s...", buffer);
         g_pfnDediInitFunc8(buffer, 0, 0);
+        LOG("DediInitFunc8 OK");
 
         void* hwnd = g_pCGame->Func24();
+        LOG("HWND=%p", hwnd);
+        LOG("DediInitFunc6...");
         g_pfnDediInitFunc6(hwnd);
+        LOG("DediInitFunc6 OK");
 
+        LOG("Setting BaseSocket HWND... g_pBaseSocket=0x%08X", g_pBaseSocket);
         *(DWORD**)(*(DWORD*)g_pBaseSocket + 0xC) = (DWORD*)g_pCGame->Func24();
+        LOG("BaseSocket HWND set OK");
+        LOG("CGame::Shutdown()...");
         g_pCGame->Shutdown();
+        LOG("CGame::Shutdown OK");
 
+        LOG("DediInitFunc10...");
         g_pfnDediInitFunc10(buffer);
         g_pfnDediInitFunc10(g_pDediInitDword5);
+        LOG("DediInitFunc10 OK");
 
+        LOG("CEngine::Load(true, basedir, cmdline)...");
         if (!g_pCEngine->Load(true, basedir, cmdline))
-            return false;
+        { LOG("FATAL: CEngine::Load failed"); return false; }
+        LOG("CEngine::Load OK");
 
         //char text[256];
         //snprintf(text, ARRAYSIZE(text), "exec %s\n", "server.cfg");
         //text[255] = 0;
+        LOG("DediInitFunc7 exec server.cfg...");
         g_pfnDediInitFunc7("exec server.cfg\n");
+        LOG("DediInitFunc7 OK");
 
+        LOG("g_pPacketHostServer=%p", (void*)g_pPacketHostServer);
         if (g_pPacketHostServer)
         {
+            LOG("DediInitFunc9...");
             g_pfnDediInitFunc9(g_pPacketHostServer, buffer);
+            LOG("DediInitFunc9 OK");
         }
+        LOG("Init() COMPLETE returning true");
         return true;
     };
     int Shutdown()
@@ -568,7 +601,7 @@ int main(int argc, char* argv)
     Console_Init();
     SetConsoleTitleA("CSO HLDS");
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
-
+    LOG("=== main() START === cmdline: %s", GetCommandLine());
     g_bTerminated = false;
 
     do {
@@ -646,10 +679,13 @@ int main(int argc, char* argv)
         if (!engineCreateInterface || !engineAPI)
             return LAUNCHER_ERROR;
 
+        LOG("Calling Hook()...");
         Hook((HMODULE)hEngine);
+        LOG("Hook() done. Calling engineAPI->Init()...");
 
         if (!engineAPI->Init(Sys_GetLongPathNameWithoutBin(), CommandLine()->GetCmdLine(), Sys_GetFactoryThis(), fsCreateInterface))
-            return LAUNCHER_ERROR;
+        { LOG("FATAL: engineAPI->Init() returned false"); return LAUNCHER_ERROR; }
+        LOG("engineAPI->Init() OK - entering main loop");
 
         if (g_iPingBoost == 4)
         {
@@ -664,23 +700,27 @@ int main(int argc, char* argv)
         default: sleep_thread = sleep_1ms;
         }
 
+        LOG("Entering main loop...");
         bool done = false;
+        int frameNum = 0;
         while (!done)
         {
             sleep_thread();
-
             PrepareConsoleInput();
-
-            if (g_bTerminated)
-                break;
-
+            if (g_bTerminated) { LOG("g_bTerminated at frame %d", frameNum); break; }
             ProcessConsoleInput();
-
-            done = !engineAPI->RunFrame();
+            bool rf = engineAPI->RunFrame();
+            if (!rf) LOG("RunFrame() FALSE at frame %d, GetQuitting=%d", frameNum, g_pCEngine->GetQuitting());
+            done = !rf;
+            if (frameNum < 3) LOG("Frame %d OK", frameNum);
+            frameNum++;
             UpdateStatus(FALSE);
         }
+        LOG("Main loop exited at frame %d", frameNum);
 
+        LOG("Shutdown()...");
         int ret = engineAPI->Shutdown();
+        LOG("Shutdown() returned %d", ret);
         if (ret == DLL_CLOSE)
             g_bTerminated = true;
 
