@@ -443,8 +443,8 @@ void Hook(HMODULE hModule)
 	{
 		BYTE b[4] = { 0,0,0,0 };
 		ReadMemory((void*)(find - 0x17), (BYTE*)b, 4);
-		WriteMemory((void*)&g_pCRegistry, (BYTE*)b, 4);
-		g_pCRegistry = *(CRegistry**)g_pCRegistry;
+		//WriteMemory((void*)&g_pCRegistry, (BYTE*)b, 4);
+		//g_pCRegistry = *(CRegistry**)g_pCRegistry;
 	}
 
 	find = FindPattern(CGAME_INSTANCE_SIG_CSNZ, CGAME_INSTANCE_MASK_CSNZ, g_dwEngineBase, g_dwEngineBase + g_dwEngineSize, NULL);
