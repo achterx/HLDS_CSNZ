@@ -32,6 +32,20 @@ char g_pLogFile[MAX_PATH];
 char g_pConsoleTitle[MAX_PATH];
 int g_iPort = 27015;
 
+// Heavy debug logging helper - defined early so all code below can use it
+static void HLDS_Log(const char* fmt, ...)
+{
+    char buf[2048];
+    va_list va;
+    va_start(va, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, va);
+    va_end(va);
+    printf("[HLDS_DBG] %s\n", buf);
+    fflush(stdout);
+    FILE* f = fopen("hlds_debug.log", "a");
+    if (f) { fprintf(f, "[HLDS_DBG] %s\n", buf); fclose(f); }
+}
+
 class IDedicatedExports : public IBaseInterface
 {
 public:
@@ -245,22 +259,6 @@ int m_nTotalLines;
 #define DEFAULT_LOBBYPORT "30002"
 #define DEFAULT_PORT "27015"
 #define DEFAULT_LOGFILE "csods"
-
-// Heavy debug logging helper
-static void HLDS_Log(const char* fmt, ...)
-{
-    char buf[2048];
-    va_list va;
-    va_start(va, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, va);
-    va_end(va);
-    printf("[HLDS_DBG] %s\n", buf);
-    fflush(stdout);
-
-    // Also write to a debug file
-    FILE* f = fopen("hlds_debug.log", "a");
-    if (f) { fprintf(f, "[HLDS_DBG] %s\n", buf); fclose(f); }
-}
 
 HINTERFACEMODULE LoadFilesystemModule(void)
 {
