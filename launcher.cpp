@@ -6,6 +6,7 @@
 #include "hook.h"
 #include <stdio.h>
 #include <thread>
+#include <chrono>
 
 //DLL State Flags
 
