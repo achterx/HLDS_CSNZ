@@ -189,16 +189,11 @@ public:
         HLDS_Log("DediInitFunc7 OK");
 
         HLDS_Log("g_pPacketHostServer = %p", (void*)g_pPacketHostServer);
-        if (g_pPacketHostServer)
-        {
-            HLDS_Log("Calling DediInitFunc9 (register HostServer packet handler)...");
-            g_pfnDediInitFunc9(g_pPacketHostServer, buffer);
-            HLDS_Log("DediInitFunc9 OK");
-        }
-        else
-        {
-            HLDS_Log("WARNING: g_pPacketHostServer is NULL! HostServer packet handler NOT registered!");
-        }
+        // DediInitFunc9 moved to after Init() returns to avoid stack corruption
+        // if (g_pPacketHostServer)
+        // {
+        //     g_pfnDediInitFunc9(g_pPacketHostServer, buffer);
+        // }
 
         HLDS_Log("GetQuitting state at end of Init = %d", g_pCEngine->GetQuitting());
         HLDS_Log("=== Init() COMPLETE - returning true ===");
@@ -779,7 +774,16 @@ int main(int argc, char* argv)
         HLDS_Log("g_pfnDediShutdown2  = %p",      (void*)g_pfnDediShutdownFunc2);
         HLDS_Log("------------------------------");
 
-        HLDS_Log("Calling engineAPI->Init(basedir='%s')...", Sys_GetLongPathNameWithoutBin());
+        // Hook ExitProcess and TerminateProcess to catch who is killing us
+    HMODULE hKernel = GetModuleHandleA("kernel32.dll");
+    if (hKernel)
+    {
+        void* pExit = GetProcAddress(hKernel, "ExitProcess");
+        void* pTerm = GetProcAddress(hKernel, "TerminateProcess");
+        HLDS_Log("ExitProcess at %p, TerminateProcess at %p", pExit, pTerm);
+    }
+
+    HLDS_Log("Calling engineAPI->Init(basedir='%s')...", Sys_GetLongPathNameWithoutBin());
         bool initResult = false;
         __try
         {
@@ -796,6 +800,16 @@ int main(int argc, char* argv)
             return LAUNCHER_ERROR;
         }
         HLDS_Log("engineAPI->Init() OK - server is running!");
+
+        // Register HostServer packet handler now that Init() has returned safely
+        if (g_pPacketHostServer && g_pfnDediInitFunc9)
+        {
+            char logbuf[MAX_PATH];
+            g_pfnDediInitFunc5(logbuf, "%s_%04d.log", g_pLogFile, g_iPort);
+            HLDS_Log("Calling DediInitFunc9 post-Init: pktHostServer=%p buf='%s'", (void*)g_pPacketHostServer, logbuf);
+            g_pfnDediInitFunc9(g_pPacketHostServer, logbuf);
+            HLDS_Log("DediInitFunc9 OK");
+        }
 
         // Log what UDP ports HLDS is listening on
         HLDS_Log("Init complete. Check netstat for UDP port %d", g_iPort);
