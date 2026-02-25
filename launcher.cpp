@@ -72,28 +72,50 @@ private:
 public:
     bool Init(const char* basedir, const char* cmdline, CreateInterfaceFn launcherFactory, CreateInterfaceFn filesystemFactory)
     {
+        HLDS_Log("=== Init() START ===");
+        HLDS_Log("basedir = '%s'", basedir);
+        HLDS_Log("cmdline = '%s'", cmdline);
+
+        HLDS_Log("Getting IDedicatedExports... g_pDediInitDwordExport=%p", g_pDediInitDwordExport);
         *(IDedicatedExports**)g_pDediInitDwordExport = (IDedicatedExports*)launcherFactory(VENGINE_DEDICATEDEXPORTS_API_VERSION, nullptr);
         if (!*(IDedicatedExports**)g_pDediInitDwordExport)
+        {
+            HLDS_Log("FATAL: IDedicatedExports is NULL!");
             return false;
+        }
+        HLDS_Log("IDedicatedExports OK: %p", *(IDedicatedExports**)g_pDediInitDwordExport);
 
         strncpy(this->m_OrigCmd, cmdline, ARRAYSIZE(this->m_OrigCmd));
         this->m_OrigCmd[ARRAYSIZE(this->m_OrigCmd) - 1] = 0;
 
+        HLDS_Log("Calling DediInitFunc1 (Sys_InitArgv)...");
         g_pfnDediInitFunc1("Sys_InitArgv( m_OrigCmd )", "Sys_ShutdownArgv()", 0);
+        HLDS_Log("Calling DediInitFunc2 (ParseCmdLine)...");
         g_pfnDediInitFunc2(this->m_OrigCmd);
+        HLDS_Log("SetQuitting(0) + g_pIsDedicated=true...");
         g_pCEngine->SetQuitting(0);
         g_pIsDedicated = true;
 
+        HLDS_Log("Calling DediInitFunc1 (FileSystem_Init)...");
         g_pfnDediInitFunc1("FileSystem_Init(basedir, (void *)filesystemFactory)", "FileSystem_Shutdown()", 0);
+        HLDS_Log("Calling DediInitFunc3 (FileSystem init basedir)...");
         if (!g_pfnDediInitFunc3(basedir, (void*)filesystemFactory))
         {
+            HLDS_Log("FATAL: DediInitFunc3 (FileSystem init) returned false!");
             return false;
         }
+        HLDS_Log("FileSystem init OK");
+
+        HLDS_Log("CGame::CreateWin()...");
         g_pCGame->CreateWin();
+        HLDS_Log("CGame::Init(nullptr)...");
         if (!g_pCGame->Init(nullptr))
         {
+            HLDS_Log("FATAL: CGame::Init failed!");
             return false;
         }
+        HLDS_Log("CGame::Init OK");
+
         char buffer[MAX_PATH];
         __time64_t currentTime = 0;
         currentTime = _time64(NULL);
@@ -102,42 +124,66 @@ public:
         _localtime64_s(&localTime, &currentTime);
 
         DWORD pid = GetCurrentProcessId();
+        HLDS_Log("PID=%u, Port=%d, LogFile='%s'", pid, g_iPort, g_pLogFile);
+
         g_pfnDediInitFunc5(buffer, "%s_%04d%02d%02d_%02d%02d%02d_%u_%d.log", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
+        HLDS_Log("Log buffer = '%s'", buffer);
         g_pfnDediInitFunc5(g_pDediInitDword5, "%sFatal_%04d%02d%02d_%02d%02d%02d_%u_%d.log", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
         g_pfnDediInitFunc5(g_pDediInitDword6, "%s_##ADDR##_%04d%02d%02d_%02d%02d%02d_%u.dmp", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
 
         snprintf(g_pConsoleTitle, sizeof(g_pConsoleTitle), "%s_%04d%02d%02d_%02d%02d%02d_%u_%d", g_pLogFile, localTime.tm_year + 1900, localTime.tm_mon + 1, localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec, pid, g_iPort);
+        HLDS_Log("Console title = '%s'", g_pConsoleTitle);
 
+        HLDS_Log("Calling DediInitFunc8 (init log)...");
         g_pfnDediInitFunc8(buffer, 0, 0);
+        HLDS_Log("DediInitFunc8 OK");
 
         void* hwnd = g_pCGame->Func24();
+        HLDS_Log("HWND from CGame::Func24() = %p", hwnd);
         g_pfnDediInitFunc6(hwnd);
+        HLDS_Log("DediInitFunc6 OK");
 
+        HLDS_Log("Setting BaseSocket HWND... g_pBaseSocket=%p", (void*)g_pBaseSocket);
+        HLDS_Log("  *(DWORD*)g_pBaseSocket = 0x%08X", *(DWORD*)g_pBaseSocket);
+        HLDS_Log("  offset+0xC addr = %p", (void*)(*(DWORD*)g_pBaseSocket + 0xC));
         *(DWORD**)(*(DWORD*)g_pBaseSocket + 0xC) = (DWORD*)g_pCGame->Func24();
+        HLDS_Log("BaseSocket HWND set OK");
+
+        HLDS_Log("CGame::Shutdown()...");
         g_pCGame->Shutdown();
+        HLDS_Log("CGame::Shutdown OK");
 
+        HLDS_Log("DediInitFunc10(buffer)...");
         g_pfnDediInitFunc10(buffer);
+        HLDS_Log("DediInitFunc10(Dword5)...");
         g_pfnDediInitFunc10(g_pDediInitDword5);
+        HLDS_Log("DediInitFunc10 OK");
 
+        HLDS_Log("CEngine::Load(basedir='%s', cmdline='%s')...", basedir, cmdline);
         if (!g_pCEngine->Load(basedir, cmdline, nullptr, buffer))
         {
-            printf("[Trace] FATAL: CEngine::Load failed\n"); fflush(stdout);
+            HLDS_Log("FATAL: CEngine::Load failed!");
             return false;
         }
-        printf("[Trace] CEngine::Load OK\n"); fflush(stdout);
+        HLDS_Log("CEngine::Load OK");
 
-        printf("[Trace] calling DediInitFunc7 (exec server.cfg)\n"); fflush(stdout);
+        HLDS_Log("Executing server.cfg via DediInitFunc7...");
         g_pfnDediInitFunc7("exec server.cfg\n");
-        printf("[Trace] DediInitFunc7 OK\n"); fflush(stdout);
+        HLDS_Log("DediInitFunc7 OK");
 
-        printf("[Trace] g_pPacketHostServer = %p\n", (void*)g_pPacketHostServer); fflush(stdout);
+        HLDS_Log("g_pPacketHostServer = %p", (void*)g_pPacketHostServer);
         if (g_pPacketHostServer)
         {
-            printf("[Trace] calling DediInitFunc9\n"); fflush(stdout);
+            HLDS_Log("Calling DediInitFunc9 (register HostServer packet handler)...");
             g_pfnDediInitFunc9(g_pPacketHostServer, buffer);
-            printf("[Trace] DediInitFunc9 OK\n"); fflush(stdout);
+            HLDS_Log("DediInitFunc9 OK");
         }
-        printf("[Trace] Init() returning true\n"); fflush(stdout);
+        else
+        {
+            HLDS_Log("WARNING: g_pPacketHostServer is NULL! HostServer packet handler NOT registered!");
+        }
+
+        HLDS_Log("=== Init() COMPLETE - returning true ===");
         return true;
     };
     int Shutdown()
@@ -195,10 +241,26 @@ int m_nInputLine;
 int m_nBrowseLine;
 int m_nTotalLines;
 
-#define DEFAULT_IP "127.0.0.1"
+#define DEFAULT_IP "0.0.0.0"
 #define DEFAULT_LOBBYPORT "30002"
 #define DEFAULT_PORT "27015"
 #define DEFAULT_LOGFILE "csods"
+
+// Heavy debug logging helper
+static void HLDS_Log(const char* fmt, ...)
+{
+    char buf[2048];
+    va_list va;
+    va_start(va, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, va);
+    va_end(va);
+    printf("[HLDS_DBG] %s\n", buf);
+    fflush(stdout);
+
+    // Also write to a debug file
+    FILE* f = fopen("hlds_debug.log", "a");
+    if (f) { fprintf(f, "[HLDS_DBG] %s\n", buf); fclose(f); }
+}
 
 HINTERFACEMODULE LoadFilesystemModule(void)
 {
@@ -574,6 +636,11 @@ int main(int argc, char* argv)
     SetConsoleTitleA("CSO HLDS");
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
+    // Delete old debug log on fresh start
+    DeleteFileA("hlds_debug.log");
+    HLDS_Log("=== HLDS main() START ===");
+    HLDS_Log("Raw cmdline: %s", GetCommandLine());
+
     g_bTerminated = false;
 
     do {
@@ -583,12 +650,20 @@ int main(int argc, char* argv)
 
         WSAData WSAData;
         WSAStartup(0x202, &WSAData);
+        HLDS_Log("WSAStartup OK");
 
         if (CommandLine()->CheckParm("-lang") == NULL)
-            CommandLine()->AppendParm("-lang", "na_"); 	// the dedicated server won't load without this line
+            CommandLine()->AppendParm("-lang", "na_");
 
-        if (CommandLine()->CheckParm("-ip") == NULL)
+        // -ip: default to 0.0.0.0 to listen on ALL interfaces (including Radmin)
+        const char* ipParam = NULL;
+        if (CommandLine()->CheckParm("-ip", &ipParam) == NULL)
+        {
             CommandLine()->AppendParm("-ip", DEFAULT_IP);
+            HLDS_Log("-ip not set, defaulting to %s (listen on all interfaces)", DEFAULT_IP);
+        }
+        else
+            HLDS_Log("-ip explicitly set to: %s", ipParam ? ipParam : "(null)");
 
         if (CommandLine()->CheckParm("-lobbyport") == NULL)
             CommandLine()->AppendParm("-lobbyport", DEFAULT_LOBBYPORT);
@@ -598,9 +673,13 @@ int main(int argc, char* argv)
         {
             CommandLine()->AppendParm("-port", DEFAULT_PORT);
             g_iPort = atoi(DEFAULT_PORT);
+            HLDS_Log("-port not set, defaulting to %d", g_iPort);
         }
         else if (port)
+        {
             g_iPort = atoi(port);
+            HLDS_Log("-port set to %d", g_iPort);
+        }
 
         const char* logfile;
         if (CommandLine()->CheckParm("-logfile", &logfile) == NULL)
@@ -622,39 +701,92 @@ int main(int argc, char* argv)
         if (CommandLine()->CheckParm("-pingboost", &pingboost) && pingboost)
             g_iPingBoost = atoi(pingboost);
 
-        HINTERFACEMODULE hFileSystem = LoadFilesystemModule();
+        HLDS_Log("=== Resolved params: port=%d, logfile='%s', pingboost=%d ===", g_iPort, g_pLogFile, g_iPingBoost);
+        HLDS_Log("Full processed cmdline: %s", CommandLine()->GetCmdLine());
 
+        HLDS_Log("LoadFilesystemModule...");
+        HINTERFACEMODULE hFileSystem = LoadFilesystemModule();
         if (!hFileSystem)
+        {
+            HLDS_Log("FATAL: LoadFilesystemModule failed!");
             return LAUNCHER_ERROR;
+        }
+        HLDS_Log("LoadFilesystemModule OK: %p", hFileSystem);
 
         CreateInterfaceFn fsCreateInterface = (CreateInterfaceFn)Sys_GetFactory(hFileSystem);
         g_pFileSystem = (IFileSystem*)fsCreateInterface(FILESYSTEM_INTERFACE_VERSION, NULL);
+        HLDS_Log("g_pFileSystem = %p", g_pFileSystem);
         g_pFileSystem->Mount();
         g_pFileSystem->AddSearchPath(Sys_GetLongPathName(), "BIN");
+        HLDS_Log("FileSystem mounted. BIN path = '%s'", Sys_GetLongPathName());
 
         const char* pszEngineDLL = "hw.dll";
+        HLDS_Log("Loading engine DLL: %s", pszEngineDLL);
 
         HINTERFACEMODULE hEngine;
-
         hEngine = Sys_LoadModule(pszEngineDLL);
         if (!hEngine)
         {
+            HLDS_Log("FATAL: Could not load %s!", pszEngineDLL);
             static char msg[512];
             wsprintf(msg, "Could not load engine : %s.", pszEngineDLL);
             MessageBox(NULL, msg, "Fatal Error", MB_ICONERROR);
             return LAUNCHER_ERROR;
         }
+        HLDS_Log("Engine DLL loaded: hEngine=%p", hEngine);
 
         CreateInterfaceFn engineCreateInterface = (CreateInterfaceFn)Sys_GetFactoryThis();
+        HLDS_Log("engineCreateInterface = %p", engineCreateInterface);
         engineAPI = (IDedicatedServerAPI*)engineCreateInterface(VENGINE_HLDS_API_VERSION, NULL);
+        HLDS_Log("engineAPI = %p", engineAPI);
 
         if (!engineCreateInterface || !engineAPI)
+        {
+            HLDS_Log("FATAL: engineCreateInterface=%p, engineAPI=%p", engineCreateInterface, engineAPI);
             return LAUNCHER_ERROR;
+        }
 
+        HLDS_Log("Calling Hook()...");
         Hook((HMODULE)hEngine);
+        HLDS_Log("Hook() OK");
 
+        // Log all pattern find results
+        HLDS_Log("--- Pattern search results ---");
+        HLDS_Log("g_pIsDedicated      = 0x%08X", g_pIsDedicated);
+        HLDS_Log("g_pDediInitDword2   = 0x%08X", g_pDediInitDword2);
+        HLDS_Log("g_pBaseSocket       = 0x%08X", g_pBaseSocket);
+        HLDS_Log("g_pPacketHostServer = %p",      (void*)g_pPacketHostServer);
+        HLDS_Log("g_pDediInitDword5   = %p",      (void*)g_pDediInitDword5);
+        HLDS_Log("g_pDediInitDword6   = %p",      (void*)g_pDediInitDword6);
+        HLDS_Log("g_pDediInitDwordExport = %p",   g_pDediInitDwordExport);
+        HLDS_Log("g_pDediInitDword8   = 0x%08X",  g_pDediInitDword8);
+        HLDS_Log("g_pServerState      = 0x%08X",  g_pServerState);
+        HLDS_Log("g_pfnDediInitFunc1  = %p",      (void*)g_pfnDediInitFunc1);
+        HLDS_Log("g_pfnDediInitFunc2  = %p",      (void*)g_pfnDediInitFunc2);
+        HLDS_Log("g_pfnDediInitFunc3  = %p",      (void*)g_pfnDediInitFunc3);
+        HLDS_Log("g_pfnDediInitFunc5  = %p",      (void*)g_pfnDediInitFunc5);
+        HLDS_Log("g_pfnDediInitFunc6  = %p",      (void*)g_pfnDediInitFunc6);
+        HLDS_Log("g_pfnDediInitFunc7  = %p",      (void*)g_pfnDediInitFunc7);
+        HLDS_Log("g_pfnDediInitFunc8  = %p",      (void*)g_pfnDediInitFunc8);
+        HLDS_Log("g_pfnDediInitFunc9  = %p",      (void*)g_pfnDediInitFunc9);
+        HLDS_Log("g_pfnDediInitFunc10 = %p",      (void*)g_pfnDediInitFunc10);
+        HLDS_Log("g_pCEngine          = %p",      (void*)g_pCEngine);
+        HLDS_Log("g_pCGame            = %p",      (void*)g_pCGame);
+        HLDS_Log("g_pCRegistry        = %p",      (void*)g_pCRegistry);
+        HLDS_Log("g_pfnDediShutdown1  = %p",      (void*)g_pfnDediShutdownFunc1);
+        HLDS_Log("g_pfnDediShutdown2  = %p",      (void*)g_pfnDediShutdownFunc2);
+        HLDS_Log("------------------------------");
+
+        HLDS_Log("Calling engineAPI->Init(basedir='%s')...", Sys_GetLongPathNameWithoutBin());
         if (!engineAPI->Init(Sys_GetLongPathNameWithoutBin(), CommandLine()->GetCmdLine(), Sys_GetFactoryThis(), fsCreateInterface))
+        {
+            HLDS_Log("FATAL: engineAPI->Init() returned false!");
             return LAUNCHER_ERROR;
+        }
+        HLDS_Log("engineAPI->Init() OK - server is running!");
+
+        // Log what UDP ports HLDS is listening on
+        HLDS_Log("Init complete. Check netstat for UDP port %d", g_iPort);
 
         if (g_iPingBoost == 4)
         {
@@ -669,35 +801,34 @@ int main(int argc, char* argv)
         default: sleep_thread = sleep_1ms;
         }
 
+        HLDS_Log("Entering main game loop (pingboost=%d)...", g_iPingBoost);
+
         bool done = false;
         while (!done)
         {
             sleep_thread();
-
             PrepareConsoleInput();
-
             if (g_bTerminated)
                 break;
-
             ProcessConsoleInput();
-
             done = !engineAPI->RunFrame();
             UpdateStatus(FALSE);
         }
 
+        HLDS_Log("Main loop exited. Shutting down...");
         int ret = engineAPI->Shutdown();
+        HLDS_Log("Shutdown returned %d", ret);
         if (ret == DLL_CLOSE)
             g_bTerminated = true;
 
         Unhook();
-
         g_pFileSystem->Unmount();
-
         Sys_FreeModule(hFileSystem);
         Sys_FreeModule(hEngine);
-
         WSACleanup();
+        HLDS_Log("Cleanup done. g_bTerminated=%d", g_bTerminated);
     } while (!g_bTerminated);
 
+    HLDS_Log("=== HLDS main() EXIT ===");
     return LAUNCHER_OK;
 }
