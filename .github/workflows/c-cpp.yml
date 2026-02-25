@@ -1,0 +1,73 @@
+name: Build HLDS CSNZ
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Build HLDS CSNZ
+    runs-on: windows-2022
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+    
+    - name: Restore NuGet packages
+      run: nuget restore CSOHLDS.sln
+      continue-on-error: true
+    
+    - name: Build Solution (Release x86)
+      run: msbuild CSOHLDS.sln /p:Configuration=Release /p:Platform=x86 /m /v:minimal
+    
+    - name: Find built files
+      shell: pwsh
+      run: |
+        Write-Host "Searching for all built DLL and EXE files..."
+        Get-ChildItem -Recurse -Include *.dll,*.exe | Where-Object { 
+          $_.FullName -notmatch "\\obj\\" -and 
+          $_.FullName -notmatch "packages\\" 
+        } | ForEach-Object { 
+          Write-Host "Found: $($_.FullName)" 
+        }
+    
+    - name: Upload artifacts (All builds)
+      uses: actions/upload-artifact@v4
+      with:
+        name: HLDS-CSNZ-Release
+        path: |
+          **/bin/**/*.dll
+          **/bin/**/*.exe
+          **/Release/**/*.dll
+          **/Release/**/*.exe
+          **/x64/**/*.dll
+          **/x64/**/*.exe
+          **/x86/**/*.dll
+          **/x86/**/*.exe
+          !**/obj/**
+          !**/packages/**
+        if-no-files-found: warn
+        retention-days: 30
+    
+    - name: Upload debug symbols
+      uses: actions/upload-artifact@v4
+      with:
+        name: HLDS-CSNZ-PDB
+        path: |
+          **/bin/**/*.pdb
+          **/Release/**/*.pdb
+          **/x64/**/*.pdb
+          **/x86/**/*.pdb
+        if-no-files-found: ignore
+        retention-days: 7
