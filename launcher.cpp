@@ -120,6 +120,9 @@ public:
         }
         HLDS_Log("FileSystem init OK");
 
+        // CRegistry::Init() intentionally disabled
+        HLDS_Log("CRegistry init skipped (disabled)");
+
         HLDS_Log("CGame::CreateWin()...");
         g_pCGame->CreateWin();
         HLDS_Log("CGame::Init(nullptr)...");
@@ -197,6 +200,7 @@ public:
             HLDS_Log("WARNING: g_pPacketHostServer is NULL! HostServer packet handler NOT registered!");
         }
 
+        HLDS_Log("GetQuitting state at end of Init = %d", g_pCEngine->GetQuitting());
         HLDS_Log("=== Init() COMPLETE - returning true ===");
         return true;
     };
@@ -776,7 +780,17 @@ int main(int argc, char* argv)
         HLDS_Log("------------------------------");
 
         HLDS_Log("Calling engineAPI->Init(basedir='%s')...", Sys_GetLongPathNameWithoutBin());
-        if (!engineAPI->Init(Sys_GetLongPathNameWithoutBin(), CommandLine()->GetCmdLine(), Sys_GetFactoryThis(), fsCreateInterface))
+        bool initResult = false;
+        __try
+        {
+            initResult = engineAPI->Init(Sys_GetLongPathNameWithoutBin(), CommandLine()->GetCmdLine(), Sys_GetFactoryThis(), fsCreateInterface);
+        }
+        __except(EXCEPTION_EXECUTE_HANDLER)
+        {
+            HLDS_Log("EXCEPTION in engineAPI->Init()! Code=0x%08X", GetExceptionCode());
+            return LAUNCHER_ERROR;
+        }
+        if (!initResult)
         {
             HLDS_Log("FATAL: engineAPI->Init() returned false!");
             return LAUNCHER_ERROR;
@@ -800,16 +814,29 @@ int main(int argc, char* argv)
         }
 
         HLDS_Log("Entering main game loop (pingboost=%d)...", g_iPingBoost);
+        HLDS_Log("GetQuitting state before loop = %d", g_pCEngine->GetQuitting());
 
         bool done = false;
+        int frameCount = 0;
         while (!done)
         {
             sleep_thread();
             PrepareConsoleInput();
             if (g_bTerminated)
+            {
+                HLDS_Log("g_bTerminated=true at frame %d, breaking", frameCount);
                 break;
+            }
             ProcessConsoleInput();
-            done = !engineAPI->RunFrame();
+            bool runResult = engineAPI->RunFrame();
+            if (!runResult)
+            {
+                HLDS_Log("RunFrame() returned FALSE at frame %d! GetQuitting=%d", frameCount, g_pCEngine->GetQuitting());
+            }
+            done = !runResult;
+            if (frameCount < 5 || frameCount % 500 == 0)
+                HLDS_Log("Frame %d: RunFrame=%d GetQuitting=%d", frameCount, (int)runResult, g_pCEngine->GetQuitting());
+            frameCount++;
             UpdateStatus(FALSE);
         }
 
