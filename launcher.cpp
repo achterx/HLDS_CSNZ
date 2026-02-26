@@ -64,9 +64,10 @@ static void LoadUsefulDlls(const std::vector<std::string>& dlls)
     for (const auto& path : dlls) {
         HMODULE h = LoadLibraryA(path.c_str());
         if (h)
-            LOG("-useful: loaded '%s' @ %p", path.c_str(), (void*)h);
+            printf("[HLDS] -useful: loaded '%s' @ %p\n", path.c_str(), (void*)h);
         else
-            LOG("-useful: FAILED to load '%s' (GetLastError=%lu)", path.c_str(), GetLastError());
+            printf("[HLDS] -useful: FAILED to load '%s' (GetLastError=%lu)\n", path.c_str(), GetLastError());
+        fflush(stdout);
     }
 }
 
