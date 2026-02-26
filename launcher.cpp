@@ -7,6 +7,77 @@
 #include <stdio.h>
 #include <thread>
 #include <chrono>
+#include <string>
+#include <vector>
+
+// ──────────────────────────────────────────────────────────────────────────
+// -useful <dll>  parameter support
+//
+// Loads one or more DLLs before the engine initialises, giving them time
+// to install hooks (e.g. a LoadLibraryA hook that patches mp.dll vtables).
+//
+// Usage:
+//   hlds.exe -useful frostbite_fix.dll -game czero +maxplayers 32
+//   hlds.exe -useful a.dll -useful b.dll -game czero
+//   hlds.exe -useful "path with spaces\fix.dll" -game czero
+// ──────────────────────────────────────────────────────────────────────────
+
+// Parse every -useful <path> pair from the raw Win32 command-line string.
+// Must be called on the raw string BEFORE CommandLine()->CreateCmdLine().
+static std::vector<std::string> ParseUsefulDlls(const char* cmdline)
+{
+    std::vector<std::string> out;
+    if (!cmdline) return out;
+    const char* p = cmdline;
+    while (*p)
+    {
+        while (*p == ' ' || *p == '\t') ++p;
+        if (!*p) break;
+        if (_strnicmp(p, "-useful", 7) == 0 &&
+            (p[7] == ' ' || p[7] == '\t' || p[7] == '\0'))
+        {
+            p += 7;
+            while (*p == ' ' || *p == '\t') ++p;
+            if (!*p) break;
+            std::string path;
+            if (*p == '"') {
+                ++p;
+                while (*p && *p != '"') path += *p++;
+                if (*p == '"') ++p;
+            } else {
+                while (*p && *p != ' ' && *p != '\t') path += *p++;
+            }
+            if (!path.empty()) out.push_back(path);
+        }
+        else
+        {
+            if (*p == '"') { ++p; while (*p && *p != '"') ++p; if (*p) ++p; }
+            else           { while (*p && *p != ' ' && *p != '\t') ++p; }
+        }
+    }
+    return out;
+}
+
+// Load each DLL and log result.
+static void LoadUsefulDlls(const std::vector<std::string>& dlls)
+{
+    for (const auto& path : dlls) {
+        HMODULE h = LoadLibraryA(path.c_str());
+        if (h)
+            LOG("-useful: loaded '%s' @ %p", path.c_str(), (void*)h);
+        else
+            LOG("-useful: FAILED to load '%s' (GetLastError=%lu)", path.c_str(), GetLastError());
+    }
+}
+
+// Strip all -useful <value> pairs from the engine's cmdline object so the
+// engine never sees an unknown flag. RemoveParm removes the flag and its
+// immediately following value token. Loop for multiple entries.
+static void StripUsefulParams()
+{
+    while (CommandLine()->CheckParm("-useful"))
+        CommandLine()->RemoveParm("-useful");
+}
 
 //DLL State Flags
 
@@ -605,7 +676,19 @@ int main(int argc, char* argv)
     g_bTerminated = false;
 
     do {
+        // ── Load -useful DLLs BEFORE CreateCmdLine ────────────────────────
+        // Parse from raw Win32 cmdline while it's still unmodified.
+        // Each DLL's DllMain runs here, before the engine or mp.dll loads.
+        {
+            auto usefulDlls = ParseUsefulDlls(GetCommandLineA());
+            if (!usefulDlls.empty()) LoadUsefulDlls(usefulDlls);
+        }
+
         CommandLine()->CreateCmdLine(GetCommandLine());
+
+        // Strip -useful pairs so the engine never sees unknown parameters.
+        StripUsefulParams();
+
         CommandLine()->RemoveParm("-steam");
         CommandLine()->AppendParm("-console", nullptr);
 

@@ -9,65 +9,61 @@ on:
 
 jobs:
   build-windows:
-    name: Build HLDS CSNZ
+    name: Build HLDS CSNZ (x86 Release)
     runs-on: windows-2022
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         submodules: recursive
-    
+
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
-    
+
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
-    
+
     - name: Restore NuGet packages
       run: nuget restore CSOHLDS.sln
       continue-on-error: true
-    
+
     - name: Build Solution (Release x86)
       run: msbuild CSOHLDS.sln /p:Configuration=Release /p:Platform=x86 /m /v:minimal
-    
-    - name: Find built files
+
+    - name: Verify x86 output
       shell: pwsh
       run: |
-        Write-Host "Searching for all built DLL and EXE files..."
-        Get-ChildItem -Recurse -Include *.dll,*.exe | Where-Object { 
-          $_.FullName -notmatch "\\obj\\" -and 
-          $_.FullName -notmatch "packages\\" 
-        } | ForEach-Object { 
-          Write-Host "Found: $($_.FullName)" 
+        $files = Get-ChildItem -Recurse -Include *.exe,*.dll |
+          Where-Object { $_.FullName -notmatch "\\obj\\" -and $_.FullName -notmatch "packages\\" }
+        foreach ($f in $files) {
+          $bytes   = [System.IO.File]::ReadAllBytes($f.FullName)
+          $peOff   = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOff + 4)
+          $arch    = if ($machine -eq 0x014C) { "x86 OK" } else { "WRONG ARCH 0x$($machine.ToString('X4'))" }
+          Write-Host "$arch  $($f.Name)"
         }
-    
-    - name: Upload artifacts (All builds)
+
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: HLDS-CSNZ-Release
         path: |
-          **/bin/**/*.dll
-          **/bin/**/*.exe
-          **/Release/**/*.dll
           **/Release/**/*.exe
-          **/x64/**/*.dll
-          **/x64/**/*.exe
-          **/x86/**/*.dll
-          **/x86/**/*.exe
+          **/Release/**/*.dll
+          **/x86/Release/**/*.exe
+          **/x86/Release/**/*.dll
           !**/obj/**
           !**/packages/**
         if-no-files-found: warn
         retention-days: 30
-    
-    - name: Upload debug symbols
+
+    - name: Upload PDBs
       uses: actions/upload-artifact@v4
       with:
         name: HLDS-CSNZ-PDB
         path: |
-          **/bin/**/*.pdb
           **/Release/**/*.pdb
-          **/x64/**/*.pdb
-          **/x86/**/*.pdb
+          **/x86/Release/**/*.pdb
         if-no-files-found: ignore
         retention-days: 7
